@@ -1,0 +1,480 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : build.media
+#Description    : usage: build.media x86_64 | i686 | arm | mips
+#                 i.e.:
+#                     build.media x86_64
+#Author         : Anil Sharma (CBIR)
+#Email          : cbir.anil@gmail.com
+#################### End ###################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   build.media  "x86_64 | i686 | arm | mips"
+    echo
+    echo i.e.:
+    echo   build.media x86_64
+    echo
+    exit 1
+fi
+
+BUILDTYPE=$1
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+ulimit -c unlimited
+
+source $TOP/packages_definitions
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+echo "----------Export Environment Variables-------"
+export PREFIX=$TOP/images/media
+TCHAIN=$TOP/$BUILDTYPE
+
+export PATH=$TCHAIN/bin:$TCHAIN/$TARGET/bin:$TCHAIN/bin:$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:$TOP/$BUILD/libexec/gcc/$TARGET/4.8.1:$PATH
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/usr/lib/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/lib64/pkgconfig:$TCHAIN/usr/lib/pkgconfig:$TCHAIN/usr/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$PREFIX/lib -L$PREFIX/lib/pulseaudio -L$TCHAIN/lib -L$TCHAIN/lib64"
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/include/freetype2 -I$PREFIX/include/json -I$PREFIX/include/alsa -I$TCHAIN/include -I$TCHAIN/usr/include"
+export CXXFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/include/json -I$TCHAIN/include -I$TCHAIN/usr/include"
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/usr/lib/pulseaudio:$TCHAIN/lib:$TCHAIN/lib64
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/usr/lib/pulseaudio:$TCHAIN/lib:$TCHAIN/lib64
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/freetype2:$TCHAIN/include:$TCHAIN/usr/include
+export CXX_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$TCHAIN/include:$TCHAIN/usr/include
+
+echo "----------Print Environment Variables ----------------"
+
+$TOP/Config/envtest
+
+function libtool_fixup {
+    sed -i -e "s_ /lib_ $PREFIX/lib_g" -e "s_'/lib_'$PREFIX/lib_g" $1
+}
+
+function buildmediapackages_component {
+
+    echo "---------------------------------------------------"
+    echo "------------------------ Building $1 --------------"
+    echo "---------------------------------------------------"
+
+    DIR=$2
+
+    case $1 in
+
+    pkg-config)
+        cd $TOP/buildoutput/$DIR/pkg-config
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    expat)
+        cd $TOP/buildoutput/$DIR/expat
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libexpat.la
+        ;;
+
+    libtool)
+        cd $TOP/buildoutput/$DIR/libtool
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libpng)
+        cd $TOP/buildoutput/$DIR/libpng
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpng15.la
+        libtool_fixup $PREFIX/lib/libpng.la
+        make distclean
+        ;;
+
+    sqlite-autoconf)
+        cd $TOP/buildoutput/$DIR/sqlite-autoconf
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libxml2)
+        cd $TOP/buildoutput/$DIR/libxml2
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libxml2.la
+        ;;
+
+    libgcrypt)
+        cd $TOP/buildoutput/$DIR/libgcrypt
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgcrypt.la
+        ;;
+
+    libgpg-error)
+        cd $TOP/buildoutput/$DIR/libgpg-error
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgpg-error.la
+        ;;
+
+    ncurses)
+        cd $TOP/buildoutput/$DIR/ncurses
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    json-c)
+        cd $TOP/buildoutput/$DIR/json-c
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libjson.la
+        ;;
+
+    fribidi)
+        cd $TOP/buildoutput/$DIR/fribidi
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfribidi.la
+        ;;
+
+    freetype)
+        cd $TOP/buildoutput/$DIR/freetype
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfreetype.la
+        ;;
+
+    zlib)
+        cd $TOP/packages/zlib
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    fontconfig)
+        cd $TOP/buildoutput/$DIR/fontconfig
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfontconfig.la
+        ;;
+
+    libffi)
+       cd $TOP/buildoutput/$DIR/libffi
+       make
+       make DESTDIR=$PREFIX install
+       libtool_fixup $PREFIX/lib/libffi.la
+       ;;
+
+    libusb)
+       cd $TOP/buildoutput/$DIR/libusb
+       make
+       make DESTDIR=$PREFIX install
+       libtool_fixup $PREFIX/lib/libusb-1.0.la
+       ;;
+
+    libogg)
+        cd $TOP/buildoutput/$DIR/libogg
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libogg.la
+        ;;
+
+    libx264)
+        cd $TOP/buildoutput/$DIR/libx264
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    live)
+        rm -rf $PREFIX/usr/local/lib
+        cd $TOP/tpd/apps/live
+        ./genMakefiles linux-with-shared-libraries
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    openssl)
+        cd $TOP/buildoutput/$DIR/openssl
+        make
+        make INSTALL_PREFIX=$PREFIX install
+        ;;
+
+    tiff)
+        cd $TOP/buildoutput/$DIR/tiff
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libtiff.la
+        libtool_fixup $PREFIX/lib/libtiffxx.la
+        ;;
+
+    alsa-lib)
+        cd $TOP/buildoutput/$DIR/alsa-lib
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libasound.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-hda.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-sbase.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-ac97.la
+        ;;
+
+    libsndfile)
+        cd $TOP/buildoutput/$DIR/libsndfile
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libsndfile.la
+        ;;
+
+    libass)
+        cd $TOP/buildoutput/$DIR/libass
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libass.la
+        ;;
+
+    pulseaudio)
+        cd $TOP/buildoutput/$DIR/pulseaudio
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpulse.la
+        libtool_fixup $PREFIX/lib/libpulsecore-3.0.la
+        libtool_fixup $PREFIX/lib/libpulse-simple.la
+        libtool_fixup $PREFIX/lib/pulseaudio/libpulsecommon-3.0.la
+        libtool_fixup $PREFIX/lib/libpulse.la
+        libtool_fixup $PREFIX/lib/pulseaudio/libpulsedsp.la
+        ;;
+
+    libdvdread)
+        cd $TOP/buildoutput/$DIR/libdvdread
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libdvdread.la
+        ;;
+
+    jpeg)
+        cd $TOP/buildoutput/$DIR/jpeg
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libjpeg.la
+        ;;
+
+    speex)
+        cd $TOP/buildoutput/$DIR/speex
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libspeex.la
+        libtool_fixup $PREFIX/lib/libspeexdsp.la
+        ;;
+
+    v4l-utils)
+        cd $TOP/buildoutput/$DIR/v4l-utils
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libv4l1.la
+        libtool_fixup $PREFIX/lib/libv4l2.la
+        libtool_fixup $PREFIX/lib/libv4l2rds.la
+        libtool_fixup $PREFIX/lib/libv4l/v4l1compat.la
+        libtool_fixup $PREFIX/lib/libv4l/v4l2convert.la
+        libtool_fixup $PREFIX/lib/libv4lconvert.la
+        libtool_fixup $PREFIX/lib/libv4l/plugins/libv4l-mplane.la
+        libtool_fixup $PREFIX/lib/libdvbv5.la
+        ;;
+
+    libvorbis)
+        cd $TOP/buildoutput/$DIR/libvorbis
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libvorbis.la
+        libtool_fixup $PREFIX/lib/libvorbisenc.la
+        libtool_fixup $PREFIX/lib/libvorbisfile.la
+        ;;
+
+    libdc1394)
+        cd $TOP/buildoutput/$DIR/libdc1394
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    dvblast)
+        cd $TOP/media/dvblast
+        make PREFIX=$PREFIX install
+        echo dvblast Install Successful
+        ;;
+
+    libaacs)
+        cd $TOP/buildoutput/$DIR/libdc1394
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libbluray)
+        cd $TOP/buildoutput/$DIR/libdc1394
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libdca)
+        cd $TOP/buildoutput/$DIR/libdc1394
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libdvbpsi)
+        cd $TOP/buildoutput/$DIR/libdc1394
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libdvbpsi.la
+        ;;
+
+    libmpeg2)
+        cd $TOP/buildoutput/$DIR/libmpeg2
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libmpeg2.la
+        libtool_fixup $PREFIX/lib/libmpeg2convert.la
+        ;;
+
+    a52dec)
+        cd $TOP/buildoutput/$DIR/a52dec
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/liba52.la
+        ;;
+
+    alsa-utils)
+        cd $TOP/buildoutput/$DIR/alsa-utils
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    bitstream)
+        cd $TOP/media/bitstream
+        make PREFIX=$PREFIX install
+        echo Bitstream Install Successful
+        ;;
+
+    ffmpeg)
+        cd $TOP/buildoutput/$DIR/ffmpeg
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    flac)
+        cd $TOP/buildoutput/$DIR/flac
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libFLAC.la
+        libtool_fixup $PREFIX/lib/libFLAC++.la
+        ;;
+
+    gstreamer)
+        cd $TOP/buildoutput/$DIR/gstreamer
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libdvdcss)
+        cd $TOP/buildoutput/$DIR/libdvdcss
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libdvdcss.la
+        ;;
+
+    libdvdnav)
+        cd $TOP/buildoutput/$DIR/libdvdnav
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libeXosip)
+        cd $TOP/buildoutput/$DIR/libeXosip
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libfreenect)
+        cd $TOP/media/libfreenect
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libosip)
+        cd $TOP/buildoutput/$DIR/libosip
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libosip2.la
+        libtool_fixup $PREFIX/lib/libosipparser2.la
+        ;;
+
+    multicat)
+        cd $TOP/media/multicat
+        make PREFIX=$PREFIX install
+        echo Multicat Install Successful
+        ;;
+
+    spandsp)
+        cd $TOP/buildoutput/$DIR/spandsp
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib64/libspandsp.la
+        ;;
+
+    *)
+        echo "wrong package"
+        echo "skip"
+        ;;
+
+    esac
+}
+
+function make_mediapack {
+
+    echo "--------- Making Media Pack ---------------"
+
+    rm -rf $TOP/images/media/DEBIAN
+    mkdir $TOP/images/media/DEBIAN
+    echo "Package: Cbirmediapack
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: Linux media utilities
+     Media utilities" > $TOP/images/media/DEBIAN/control
+
+    cd $TOP/images/media/..
+    find ./media -type d | xargs chmod 755
+    dpkg-deb --build media
+    mkdir -p $TOP/images/builds
+    mv media.deb $TOP/images/builds/cbirmediapack-$BUILDTYPE.deb
+}
+
+function build_media_packages {
+        rm -rf $TOP/images/media
+        mkdir -p $TOP/images/media
+        for pack in $media_packages; do
+            buildmediapackages_component $pack media
+        done
+}
+
+build_media_packages
+while IFS= read -r -d $'\0' file; do
+    echo "Changing $file"
+    sed -i -e 's@$PREFIX/lib@/lib@g' \
+     -e 's@$PREFIX/libexec@/libexec@g' \
+     -e 's@$PREFIX/usr/lib@/usr/lib@g' $file
+done < <(find $PREFIX -name *.la -print0)
+
+make_mediapack

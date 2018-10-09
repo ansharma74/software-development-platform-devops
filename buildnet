@@ -1,0 +1,229 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : buildnet
+#Description    : usage: buildnet <package_type> build
+#                 i.e.:
+#                     buildnet fwc x86_64
+#Author         : Anil Sharma (CBIR)
+#Email          : cbir.anil@gmail.com
+#################### End ###################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   buildnet "package_type" "build"
+    echo   
+    echo i.e.:
+    echo   buildnet fwc x86_64
+    echo    
+    exit 1
+fi
+
+BUILDTYPE=$1
+BUILD=$2
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+echo "----------Export Environment Variables-------"
+
+case "$BUILD" in
+    x86_64)
+        echo "x86_64 Build"
+        export CC="x86_64-unknown-linux-gnu-gcc"
+        export CXX="x86_64-unknown-linux-gnu-g++"
+        export AR="x86_64-unknown-linux-gnu-ar"
+        export RANLIB="x86_64-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="x86_64-unknown-linux-gnu"
+        ;;
+
+    i686)
+        echo "i686 Build"
+        export CC="i686-unknown-linux-gnu-gcc"
+        export CXX="i686-unknown-linux-gnu-g++"
+        export AR="i686-unknown-linux-gnu-ar"
+        export RANLIB="i686-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="i686-unknown-linux-gnu"
+        ;;
+
+    arm)
+        echo "arm Build"
+        export CC="arm-unknown-linux-gnu-gcc"
+        export CXX="arm-unknown-linux-gnu-g++"
+        export AR="arm-unknown-linux-gnu-ar"
+        export RANLIB="arm-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="arm-unknown-linux-gnu"
+        ;;
+
+    mips)
+        echo "mips Build"
+        export CC="mips-unknown-linux-gnu-gcc"
+        export CXX="mips-unknown-linux-gnu-g++"
+        export AR="mips-unknown-linux-gnu-ar"
+        export RANLIB="mips-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="mips-unknown-linux-gnu"
+        ;;
+
+    *)  
+        echo "Platform choices are: x86_64, i686, arm, mips"
+        exit 1
+        ;;
+esac
+
+export PREFIX=$TOP/images/$BUILDTYPE
+LNX_P=$TOP/images/qt4
+TCHAIN=$TOP/x86_64
+
+export PATH=$LNX_P/bin:$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:$TCHAIN/bin:$TCHAIN/$TARGET/bin:$TCHAIN/libexec/gcc/$TARGET/4.8.1
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$LNX_P/lib/pkgconfig:$LNX_P/lib64/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$LNX_P/lib -L$LNX_P/lib64 -L$TCHAIN/lib -L$TCHAIN/lib64 -L$TCHAIN/$HOST/$TARGET/lib"
+export CFLAGS="-fPIC -I$PREFIX/include -I$LNX_P/include -I$TCHAIN/usr/include -I$TCHAIN/include"
+export CPPFLAGS="-fPIC -I$PREFIX/include -I$LNX_P/include -I$TCHAIN/usr/include -I$TCHAIN/include"
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$LNX_P/lib:$TCHAIN/lib64:$TCHAIN/lib:$LNX_P/lib64:$TCHAIN/$HOST/$TARGET/lib
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$LNX_P/lib:$LNX_P/lib64:$TCHAIN/lib:$TCHAIN/lib64:$TCHAIN/$HOST/$TARGET/lib
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$LNX_P/include:$LNX/usr/include:$TCHAIN/include
+export CXX_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$LNX_P/include:$LNX_P/usr/include:$TCHAIN/include
+
+echo "----------Print Build Config----------------"
+
+$TOP/Config/envtest
+
+function libtool_fixup {
+    sed -i -e "s@ /lib@ $PREFIX/lib@g" -e "s@'/lib@'$PREFIX/lib@g" $1
+}
+
+function make_rtpack {
+
+    echo "---------------------------------------------------"
+    echo "------------------- Building routing --------------"
+    echo "---------------------------------------------------"
+
+    cd $TOP/routing
+    ./configure --prefix= --with-pic 
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+    echo "--------- Making Routing Manager Pack ---------------"
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: cbirrouting
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Routing Manager
+    CBIR Routing manager" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./routing -type d | xargs chmod 755
+    dpkg-deb --build routing
+    mkdir -p $TOP/images/builds
+    mv routing.deb /tmp/builds/cbirrouting.deb
+}
+
+function make_fwcpack {
+
+    echo "--------- Making Firewall Controller ---------------"
+
+    rm -rf $TOP/buildoutput/fwc/expat
+    mkdir -p $TOP/buildoutput/fwc/expat
+    cd $TOP/buildoutput/fwc/expat
+    ../../../packages/expat/configure --prefix= --with-pic
+    make
+    make DESTDIR=$PREFIX install
+    libtool_fixup $PREFIX/lib/libexpat.la
+    make distclean
+
+    rm -rf $TOP/buildoutput/fwc/python
+    mkdir -p $TOP/buildoutput/fwc/python
+    cd $TOP/buildoutput/fwc/python
+    ../../../packages/python/configure --prefix= 
+    make
+    make DESTDIR=$PREFIX install
+    make clean
+
+    cd $TOP/packages/libxml2
+    ./configure --prefix= \
+        --with-pic --enable-shared --with-python=$PREFIX
+    make
+    make DESTDIR=$PREFIX install
+    libtool_fixup $PREFIX/lib/libxml2.la
+    make distclean
+
+    cd $TOP/packages/libxslt
+    XSLTPROC=$PREFIX/xsltproc/xsltproc \
+    ./configure --prefix= \
+        --with-pic --enable-shared --with-python=$PREFIX \
+        --with-libxml-include-prefix=$PREFIX/include/libxml2
+    make
+    make DESTDIR=$PREFIX install
+    libtool_fixup $PREFIX/lib/libxslt.la
+    libtool_fixup $PREFIX/lib/libexslt.la
+    make distclean
+
+    cd $TOP/fwc
+    ./configure --prefix= --with-pic 
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+while IFS= read -r -d $'\0' file; do
+    echo "Changing $file"
+    sed -i -e 's@$PREFIX/lib@/$INSTDIR/lib@g' \
+     -e 's@$PREFIX/libexec@/$INSTDIR/libexec@g' \
+     -e 's@$PREFIX/usr/lib@/$INSTDIR/usr/lib@g' $file
+done < <(find $PREFIX -name *.la -print0)
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: cbirfwc
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR firewall controller 
+    Firewall config and operations manager" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./fwc -type d | xargs chmod 755
+    dpkg-deb --build fwc
+    mkdir -p $TOP/images/builds
+    mv fwc.deb $TOP/images/builds/cbirfwcpack.deb
+}
+
+case "$BUILDTYPE" in
+    routing)
+        make_rtpack
+        ;;
+    fwc)
+        make_fwcpack
+        ;;
+    *)   
+        echo "Choices are as follows: routing | fwc"
+        exit 1
+        ;;
+esac
+

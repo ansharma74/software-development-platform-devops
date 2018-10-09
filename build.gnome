@@ -1,0 +1,643 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : build.gnome
+#Description    : usage: build.gnome x86_64 | i686 | arm | mips
+#                 i.e.:
+#                     build.gnome x86_64
+#Author         : Anil Sharma (CBIR)
+#Email          : cbir.anil@gmail.com
+#################### End ###################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   build.gnome  "x86_64 | i686 | arm | mips"
+    echo
+    echo i.e.:
+    echo   build.gnome  x86_64
+    echo
+    exit 1
+fi
+
+BUILD=$1
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+ulimit -c unlimited
+
+source $TOP/packages_definitions
+
+echo "----------Testing Build Tool Versions----------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Printing Environment Variables-------"
+
+$TOP/Config/envtest
+
+echo "Clean directories"
+
+for pack in $gnome_packages; do
+    echo " ------ Cleaning $pack ------"
+    case "$pack" in
+    dbus)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    zlib)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    libxml2)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    popt)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    gettext)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    expat)
+        cd $TOP/packages/$pack
+        if [ -f configure.log ]
+        then
+            make distclean
+        fi
+        ;;
+
+    jpeg)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    tiff)
+        cd $TOP/media/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    glib)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    intltool)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    libffi)
+        cd $TOP/packages/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+
+    libical)
+        cd $TOP/tpd/display/$pack
+        if [ -f Makefile ]
+        then
+            make clean
+        fi
+        ;;
+
+    *)
+        cd $TOP/tpd/display/$pack
+        if [ -f Makefile ]
+        then
+            make distclean
+        fi
+        ;;
+    esac
+    cd $TOP
+done
+
+export PREFIX=$TOP/images/gnome
+
+export PATH=$PREFIX/bin:$PREFIX/usr/bin:$PREFIX/sbin:$PREFIX/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/usr/lib/pkgconfig:$PREFIX/usr/lib64/pkgconfig
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/libexec:$PREFIX/usr/lib64
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/glib-2.0:$PREFIX/lib/glib-2.0/include:$PREFIX/include/pixman-1:$PREFIX/include/freetype2:$PREFIX/include/harfbuzz:$PREFIX/include/cairo:$PREFIX/include/libIDL-2.0:$PREFIX/include/X11
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/libexec:$PREFIX/usr/lib64
+export CXX_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/glib-2.0:$PREFIX/lib/glib-2.0/include:$PREFIX/include/pixman-1:$PREFIX/include/freetype2:$PREFIX/include/harfbuzz:$PREFIX/include/cairo:$PREFIX/include/libIDL-2.0:$PREFIX/include/X11
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include -I$PREFIX/include/pixman-1 -I$PREFIX/include/freetype2 -I$PREFIX/include/harfbuzz -I$PREFIX/include/cairo -I$PREFIX/include/libIDL-2.0 -I$PREFIX/include/X11"
+export CXXFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include -I$PREFIX/include/pixman-1 -I$PREFIX/include/freetype2 -I$PREFIX/include/harfbuzz -I$PREFIX/include/cairo -I$PREFIX/include/libIDL-2.0 -I$PREFIX/include/X11"
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$PREFIX/usr/lib -L$PREFIX/libexec -L$PREFIX/usr/lib64" 
+
+function libtool_fixup {
+    sed -i -e "s_ /lib_ $PREFIX/lib_g" -e "s_'/lib_'$PREFIX/lib_g" $1
+}
+
+function build_gnome_component {
+
+    echo "----------------------------------------------------------"
+    echo "------------------- building $1 --------------------------"
+    echo "----------------------------------------------------------"
+
+    DIR=$2
+
+    case $1 in
+    atk)
+        rm -rf $TOP/buildoutput/$DIR/atk
+        mkdir $TOP/buildoutput/$DIR/atk
+        cd $TOP/buildoutput/$DIR/atk
+        ../../../tpd/display/atk/configure --prefix= --with-pic 
+        make 
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libatk-1.0.la
+        make distclean
+        ;;
+
+     at-spi)
+        rm -rf $TOP/buildoutput/$DIR/at-spi
+        mkdir $TOP/buildoutput/$DIR/at-spi
+        cd $TOP/buildoutput/$DIR/at-spi
+        ../../../tpd/display/at-spi/configure --prefix= --with-pic --without-x
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    at-spi2-atk)
+        rm -rf $TOP/buildoutput/$DIR/at-spi2-atk
+        mkdir $TOP/buildoutput/$DIR/at-spi2-atk
+        cd $TOP/buildoutput/$DIR/at-spi2-atk
+        ../../../tpd/display/at-spi2-atk/configure --prefix= -with-pic
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    dbus)
+        rm -rf $TOP/buildoutput/$DIR/dbus
+        mkdir $TOP/buildoutput/$DIR/dbus
+        cd $TOP/buildoutput/$DIR/dbus
+        ../../../packages/dbus/configure --prefix= --with-pic \
+            --enable-silent-rules
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libdbus-1.la
+        make distclean
+        ;;
+
+    fribidi)
+        rm -rf $TOP/buildoutput/$DIR/fribidi
+        mkdir $TOP/buildoutput/$DIR/fribidi
+        cd $TOP/buildoutput/$DIR/fribidi
+        ../../../tpd/display/fribidi/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfribidi.la
+        make distclean
+        ;;
+
+    freetype)
+        rm -rf $TOP/buildoutput/$DIR/freetype
+        mkdir $TOP/buildoutput/$DIR/freetype
+        cd $TOP/buildoutput/$DIR/freetype
+        ../../../tpd/display/freetype/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfreetype.la
+        make distclean
+        ;;
+
+    fontconfig)
+        rm -rf $TOP/buildoutput/$DIR/fontconfig
+        mkdir $TOP/buildoutput/$DIR/fontconfig
+        cd $TOP/buildoutput/$DIR/fontconfig
+        export FONTCONFIG_SOURCE=$TOP/tpd/display/fontconfig
+        $TOP/Config/fontconfig_tree
+        ./configure --prefix= --with-pic --disable-docs \
+              --with-expat=$TOP/packages/expat
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfontconfig.la
+        make distclean
+        export FONTCONFIG_SOURCE=
+        ;;
+
+    zlib)
+        cd $TOP/packages/zlib
+        ./configure --prefix= 
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    expat)
+        rm -rf $TOP/buildoutput/$DIR/expat
+        mkdir $TOP/buildoutput/$DIR/expat
+        cd $TOP/buildoutput/$DIR/expat
+        ../../../packages/expat/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libexpat.la
+        make distclean
+        ;;
+
+    tiff)
+        rm -rf $TOP/buildoutput/$DIR/tiff
+        mkdir $TOP/buildoutput/$DIR/tiff
+        cd $TOP/buildoutput/$DIR/tiff
+        ../../../media/tiff/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libtiff.la
+        libtool_fixup $PREFIX/lib/libtiffxx.la
+        make distclean
+        ;;
+
+    jpeg)
+        rm -rf $TOP/buildoutput/$DIR/jpeg
+        mkdir $TOP/buildoutput/$DIR/jpeg
+        cd $TOP/buildoutput/$DIR/jpeg
+        ../../../packages/jpeg/configure --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libjpeg.la
+        make distclean
+        ;;
+
+    gettext)
+        rm -rf $TOP/buildoutput/$DIR/gettext
+        mkdir $TOP/buildoutput/$DIR/gettext
+        cd $TOP/buildoutput/$DIR/gettext
+        ../../../packages/gettext/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgettextlib.la
+        libtool_fixup $PREFIX/lib/libgettextpo.la
+        libtool_fixup $PREFIX/lib/libgettextsrc.la
+        make distclean
+        ;;
+
+    libpng)
+        rm -rf $TOP/buildoutput/$DIR/libpng
+        mkdir $TOP/buildoutput/$DIR/libpng
+        cd $TOP/buildoutput/$DIR/libpng
+        ../../../tpd/display/libpng/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpng15.la
+        libtool_fixup $PREFIX/lib/libpng.la
+        make distclean
+        ;;
+
+    libffi)
+       rm -rf $TOP/buildoutput/$DIR/libffi
+       mkdir $TOP/buildoutput/$DIR/libffi
+       cd $TOP/buildoutput/$DIR/libffi
+       ../../../packages/libffi/configure \
+        --prefix= --with-pic
+       make
+       make DESTDIR=$PREFIX install
+       libtool_fixup $PREFIX/lib/libffi.la
+       make distclean
+       ;;
+
+    libIDL)
+        rm -rf $TOP/buildoutput/$DIR/libIDL
+        mkdir $TOP/buildoutput/$DIR/libIDL
+        cd $TOP/buildoutput/$DIR/libIDL
+        ../../../tpd/display/libIDL/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libIDL-2.la
+        make distclean
+        ;;
+
+    xproto)
+        rm -rf $TOP/buildoutput/$DIR/xproto
+        mkdir $TOP/buildoutput/$DIR/xproto
+        cd $TOP/buildoutput/$DIR/xproto
+        ../../../tpd/display/xproto/configure --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    libX11)
+        rm -rf $TOP/buildoutput/$DIR/libX11
+        mkdir $TOP/buildoutput/$DIR/libX11
+        cd $TOP/buildoutput/$DIR/libX11
+        ../../../tpd/display/libX11/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libX11.la
+        make distclean
+        ;;
+
+    libxml2)
+        cd $TOP/packages/libxml2
+        ./configure --prefix= \
+        --with-pic --enable-shared --with-python=$PREFIX
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libxml2.la
+        make distclean
+        ;;
+
+    ORBit2)
+        rm -rf $TOP/buildoutput/$DIR/ORBit2
+        mkdir $TOP/buildoutput/$DIR/ORBit2
+        cd $TOP/buildoutput/$DIR/ORBit2
+        ../../../tpd/display/ORBit2/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libORBitCosNaming-2.la
+        libtool_fixup $PREFIX/lib/libORBit-2.la
+        libtool_fixup $PREFIX/lib/libORBit-imodule-2.la
+        #libtool_fixup $PREFIX/orbit-2.0/Bonobo_module.la
+        #libtool_fixup $PREFIX/orbit-2.0/Everything_module.la
+        make distclean
+        ;;
+
+    libbonobo)
+        rm -rf $TOP/buildoutput/$DIR/libbonobo
+        mkdir $TOP/buildoutput/$DIR/libbonobo
+        cd $TOP/buildoutput/$DIR/libbonobo
+        ../../../tpd/display/libbonobo/configure --prefix= --with-pic \
+            ORBIT_IDL=$PREFIX/bin/orbit-idl-2 \
+            LIBBONOBO_CFLAGS="-I$PREFIX/include/orbit-2.0 -I$PREFIX/include/libxml2"
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libbonobo-activation.la
+        libtool_fixup $PREFIX/lib/libbonobo-2.la
+        libtool_fixup $PREFIX/lib/bonobo/monikers/libmoniker_std_2.la
+        make distclean
+        ;;
+
+    glib)
+        rm -rf $TOP/buildoutput/$DIR/glib
+        mkdir $TOP/buildoutput/$DIR/glib
+        cd $TOP/buildoutput/$DIR/glib
+        ../../../packages/glib/configure --prefix= \
+        --with-pic --disable-man \
+        DBUS1_CFLAGS="-I$PREFIX/include/dbus-1.0 -I$PREFIX/lib/dbus-1.0/include" \
+        LIBFFI_CFLAGS="-I$PREFIX/lib/libffi-3.0.11/include"
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgio-2.0.la
+        libtool_fixup $PREFIX/lib/libglib-2.0.la
+        libtool_fixup $PREFIX/lib/libgmodule-2.0.la
+        libtool_fixup $PREFIX/lib/libgthread-2.0.la
+        libtool_fixup $PREFIX/lib/libgobject-2.0.la
+        make distclean
+        ;;
+
+    gtk+)
+        rm -rf $TOP/buildoutput/$DIR/gtk+
+        mkdir $TOP/buildoutput/$DIR/gtk+
+        cd $TOP/buildoutput/$DIR/gtk+
+        ../../../tpd/display/gtk+/configure --prefix= --with-pic 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    harfbuzz)
+        rm -rf $TOP/buildoutput/$DIR/harfbuzz
+        mkdir $TOP/buildoutput/$DIR/harfbuzz
+        cd $TOP/buildoutput/$DIR/harfbuzz
+        ../../../tpd/display/harfbuzz/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libharfbuzz.la
+        make distclean
+        ;;
+
+    intltool)
+        rm -rf $TOP/buildoutput/$DIR/intltool
+        mkdir $TOP/buildoutput/$DIR/intltool
+        cd $TOP/buildoutput/$DIR/intltool
+        ../../../packages/intltool/configure --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    libXi)
+        rm -rf $TOP/buildoutput/$DIR/libXi
+        mkdir $TOP/buildoutput/$DIR/libXi
+        cd $TOP/buildoutput/$DIR/libXi
+        ../../../tpd/display/libXi/configure \
+            --prefix= --with-pic 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    libXpm)
+        rm -rf $TOP/buildoutput/$DIR/libXpm
+        mkdir $TOP/buildoutput/$DIR/libXpm
+        cd $TOP/buildoutput/$DIR/libXpm
+        ../../../tpd/display/libXpm/configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    libXt)
+        rm -rf $TOP/buildoutput/$DIR/libXt
+        mkdir $TOP/buildoutput/$DIR/libXt
+        cd $TOP/buildoutput/$DIR/libXt
+        ../../../tpd/display/libXt/configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    libXv)
+        rm -rf $TOP/buildoutput/$DIR/libXv
+        mkdir $TOP/buildoutput/$DIR/libXv
+        cd $TOP/buildoutput/$DIR/libXv
+        ../../../tpd/display/libXv/configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    pixman)
+        rm -rf $TOP/buildoutput/$DIR/pixman
+        mkdir $TOP/buildoutput/$DIR/pixman
+        cd $TOP/buildoutput/$DIR/pixman
+        ../../../tpd/display/pixman/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpixman-1.la
+        make distclean
+        ;;
+
+    pango)
+        rm -rf $TOP/buildoutput/$DIR/pango
+        mkdir $TOP/buildoutput/$DIR/pango
+        cd $TOP/buildoutput/$DIR/pango
+        ../../../tpd/display/pango/configure \
+            --prefix= --with-xft
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpangocairo-1.0.la
+        libtool_fixup $PREFIX/lib/libpangoft2-1.0.la
+        libtool_fixup $PREFIX/lib/libpango-1.0.la
+        libtool_fixup $PREFIX/lib/pango/1.8.0/modules/pango-arabic-lang.la
+        libtool_fixup $PREFIX/lib/pango/1.8.0/modules/pango-indic-lang.la
+        libtool_fixup $PREFIX/lib/pango/1.8.0/modules/pango-basic-fc.la
+        make distclean
+        ;;
+
+    popt)
+        rm -rf $TOP/buildoutput/$DIR/popt
+        mkdir $TOP/buildoutput/$DIR/popt
+        cd $TOP/buildoutput/$DIR/popt
+        ../../../packages/popt/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpopt.la
+        make distclean
+        ;;
+
+    cairo)
+        rm -rf $TOP/buildoutput/$DIR/cairo
+        mkdir $TOP/buildoutput/$DIR/cairo
+        cd $TOP/buildoutput/$DIR/cairo
+        ../../../tpd/display/cairo/configure --prefix= \
+            --with-pic --enable-xml
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/cairo/libcairo-trace.la
+        #libtool_fixup $PREFIX/lib/cairo-gobject.la
+        libtool_fixup $PREFIX/lib/cairo/libcairo-trace.la
+        libtool_fixup $PREFIX/lib/libcairo.la
+        libtool_fixup $PREFIX/lib/libcairo-script-interpreter.la
+        make distclean
+        ;;
+
+    gdk-pixbuf)
+        rm -rf $TOP/buildoutput/$DIR/gdk-pixbuf
+        mkdir $TOP/buildoutput/$DIR/gdk-pixbuf
+        cd $TOP/buildoutput/$DIR/gdk-pixbuf
+        ../../../tpd/display/gdk-pixbuf/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-png.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-gif.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-bmp.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-ani.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-ico.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-pcx.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-jpeg.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-wbmp.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-qtif.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-tiff.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-xpm.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-pnm.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-icns.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-ras.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-xbm.la
+        libtool_fixup $PREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-tga.la
+        #libtool_fixup $PREFIX/lib/libgdk-pixbuf-2.0.la
+        make distclean
+        ;;
+
+    webkitgtk)
+        rm -rf $TOP/buildoutput/$DIR/webkitgtk
+        mkdir $TOP/buildoutput/$DIR/webkitgtk
+        cd $TOP/buildoutput/$DIR/webkitgtk
+        ../../../tpd/display/webkitgtk/configure --prefix= --with-pic 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    *)  
+        echo "Wrong gnome pack"
+        exit 1
+        ;;         
+ 
+    esac
+ 
+}
+
+function make_gnomepack {
+
+    echo "--------- Making Gnome Pack ---------------"
+
+    rm -rf $TOP/images/gnome/DEBIAN
+    mkdir $TOP/images/gnome/DEBIAN
+    echo "Package: Cbirgnomepack
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: Linux gnome utilities
+     Gnome utilities" > $TOP/images/gnome/DEBIAN/control
+
+    cd $TOP/images/gnome/..
+    find ./gnome -type d | xargs chmod 755
+    dpkg-deb --build gnome
+    mkdir -p $PREFIX/builds
+    mv gnome.deb $PREFIX/builds/cbirgnomepack-$BUILD.deb
+}
+
+function config_gnome_packages {
+    rm -rf $TOP/buildoutput/gnome
+    mkdir -p $TOP/buildoutput/gnome
+    rm -rf $TOP/images/gnome
+    mkdir -p $TOP/images/gnome
+    for pack in $gnome_packages; do
+        build_gnome_component $pack gnome
+    done
+}
+
+config_gnome_packages
+make_gnomepack

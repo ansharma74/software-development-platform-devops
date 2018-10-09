@@ -1,0 +1,755 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : build.platform
+#Description    : usage: 
+#  build.platform cce | access | vl | yate x86_64 | i686 | arm | mips
+#                 i.e.:
+#                     build.platform vl x86_64
+#Author         : Anil Sharma (CBIR)
+#Email          : cbir.anil@gmail.com
+#################### End ###################################
+
+
+set -e
+set -o pipefail
+
+MINPARAMS=2
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   build.platform "cce | access | vl | yate" "x86_64 | i686 | arm | mips"
+    echo   
+    echo i.e.:
+    echo   build.platform vl x86_64
+    echo    
+    exit 1
+fi
+
+BUILDTYPE=$1
+BUILD=$2
+CCE=0
+ACCESS=0
+VIDLAN=0
+YATE=0
+HOST=""
+TARGET=""
+
+TOP=`pwd`
+echo Base is=$TOP
+source $TOP/packages_definitions
+
+case "$BUILDTYPE" in
+    access) 
+        echo "Access Build"
+        ACCESS=1
+        ;;
+    cce) 
+        echo "CCE Build"
+        CCE=1
+        ;;
+    yate) 
+        echo "YATE Build"
+        YATE=1
+        ;;
+    vl) 
+        echo "VL Build"
+        VIDLAN=1
+        ;;
+    *)   
+        echo "Choices are: cce, access, vl"
+        exit 1
+        ;;
+esac
+
+case "$BUILD" in
+    x86_64) 
+        echo "x86_64 Build"
+        export CC="x86_64-unknown-linux-gnu-gcc"
+        export CXX="x86_64-unknown-linux-gnu-g++"
+        export AR="x86_64-unknown-linux-gnu-ar"
+        export RANLIB="x86_64-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="x86_64-unknown-linux-gnu"
+        ;;
+    i686) 
+        echo "i686 Build"
+        export CC="i686-unknown-linux-gnu-gcc"
+        export CXX="i686-unknown-linux-gnu-g++"
+        export AR="i686-unknown-linux-gnu-ar"
+        export RANLIB="i686-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="i686-unknown-linux-gnu"
+        ;;
+    arm) 
+        echo "arm Build"
+        export CC="arm-unknown-linux-gnu-gcc"
+        export CXX="arm-unknown-linux-gnu-g++"
+        export AR="arm-unknown-linux-gnu-ar"
+        export RANLIB="arm-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="arm-unknown-linux-gnu"
+        ;;
+    mips) 
+        echo "mips Build"
+        export CC="mips-unknown-linux-gnu-gcc"
+        export CXX="mips-unknown-linux-gnu-g++"
+        export AR="mips-unknown-linux-gnu-ar"
+        export RANLIB="mips-unknown-linux-gnu-ranlib"
+        export HOST="x86_64-pc-linux-gnu"
+        export TARGET="mips-unknown-linux-gnu"
+        ;;
+    *)   
+        echo "Platform choices are: x86_64, i686, arm, mips"
+        exit 1
+        ;;
+esac
+
+echo "--------------Testing Build Tool Versions--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+function setenv_media {
+
+export PREFIX=$TOP/images/$BUILDTYPE
+TCHAIN=$TOP/$BUILD
+MEDIA_P=$TOP/images/media
+QT_P=$TOP/images/qt4
+
+export PATH=$QT_P/bin:$TOP/$BUILD/bin:$TOP/$BUILD/$TARGET/bin:$MEDIA_P/bin:$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:$TOP/$BUILD/libexec/gcc/$TARGET/4.8.1:$PATH
+
+export PKG_CONFIG_PATH=$MEDIA_P/lib/pkgconfig:$MEDIA_P/lib64/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/usr/lib/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/lib64/pkgconfig:$QT_P/lib/pkgconfig
+
+export LDFLAGS="-L$MEDIA_P/lib -L$MEDIA_P/lib64 -L$PREFIX/lib -L$PREFIX/lib64 -L$PREFIX/usr/lib64 -L$PREFIX/usr/lib -L$TCHAIN/$HOST/$TARGET/lib -L$TCHAIN/lib -L$TCHAIN/lib64 -B$TCHAIN/libexec/gcc/$TARGET/4.8.1 -B$TCHAIN/lib/gcc/$TARGET/4.8.1 -L$TCHAIN/lib/gcc/$TARGET/4.8.1 -L$QT_P/lib"
+
+export CFLAGS="-fPIC -I$MEDIA_P/include -I$MEDIA_P/usr/include -I$PREFIX/include -I$PREFIX/usr/include -I$MEDIA_P/include/ncurses -I$PREFIX/include/wvstreams -I$PREFIX/include/libnl3 -I$TCHAIN/usr/include -I$TCHAIN/include -I$TCHAIN/include/linux -I$TCHAIN/lib/gcc/$TARGET/4.8.1/include -I$QT_P/include"
+
+export CXXFLAGS="-fPIC -I$MEDIA_P/include -I$MEDIA_P/usr/include -I$PREFIX/include -I$PREFIX/usr/include -I$MEDIA_P/include/ncurses -I$PREFIX/include/wvstreams -I$PREFIX/include/libnl3 -I$TCHAIN/usr/include -I$TCHAIN/include -I$TCHAIN/include/linux -I$TCHAIN/lib/gcc/$TARGET/4.8.1/include -I$QT_P/include"
+
+export LD_LIBRARY_PATH=$MEDIA_P/lib:$MEDIA_P/lib64:$PREFIX/lib:$PREFIX/lib64:$MEDIA_P/usr/lib:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64:$PREFIX/usr/lib64:$TCHAIN/libexec/gcc/$TARGET/4.8.1:$QT_P/lib
+
+export LIBRARY_PATH=$MEDIA_P/lib:$MEDIA_P/lib64:$PREFIX/lib:$PREFIX/lib64:$MEDIA_P/usr/lib:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64:$PREFIX/usr/lib64:$TCHAIN/libexec/gcc/$TARGET/4.8.1:$QT_P/lib
+
+export C_INCLUDE_PATH=$MEDIA_P/include:$MEDIA_P/usr/include:$PREFIX/include:$PREFIX/usr/include:$MEDIA_P/include/ncurses:$PREFIX/include/wvstreams:$PREFIX/include/libnl3:$TCHAIN/usr/include:$TCHAIN/include:$TCHAIN/lib/gcc/$TARGET/4.8.1/include:$QT_P/include
+
+export CXX_INCLUDE_PATH=$MEDIA_P/include:$MEDIA_P/usr/include:$PREFIX/include:$PREFIX/usr/include:$MEDIA_P/include/ncurses:$PREFIX/include/wvstreams:$PREFIX/include/libnl3:$TCHAIN/usr/include:$TCHAIN/include:$TCHAIN/lib/gcc/$TARGET/4.8.1/include:$QT_P/include
+
+
+echo "----------Printing Environment Variables-------"
+
+$TOP/Config/envtest
+
+}
+
+function setenv_access {
+
+export PREFIX=$TOP/images/$BUILDTYPE
+TCHAIN=$TOP/$BUILD
+
+export PATH=$TOP/$BUILD/bin:$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:$PATH
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/usr/lib/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$PREFIX/usr/lib64 -L$PREFIX/usr/lib -L$TCHAIN/$HOST/$TARGET/lib -L$TCHAIN/lib -L$TCHAIN/lib64"
+
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$PREFIX/include/wvstreams -I$PREFIX/include/libnl3 -I$TCHAIN/include -I$TCHAIN/usr/include -I$PREFIX/include/orbit-2.0"
+
+export CXXFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$PREFIX/include/wvstreams -I$PREFIX/include/libnl3 -I$TCHAIN/include -I$TCHAIN/usr/include -I$PREFIX/include/orbit-2.0"
+
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64:$PREFIX/usr/lib64
+
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64:$PREFIX/usr/lib64
+
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/wvstreams:$PREFIX/include/libnl3:$TCHAIN/include:$TCHAIN/usr/include:$PREFIX/include/orbit-2.0
+
+export CXX_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/wvstreams:$PREFIX/include/libnl3:$TCHAIN/include:$TCHAIN/usr/include:$PREFIX/include/orbit-2.0
+
+echo "----------Printing Environment Variables-------"
+
+$TOP/Config/envtest
+
+}
+
+function libtool_fixup {
+    sed -i -e "s_ /lib_ $PREFIX/lib_g" -e "s_'/lib_'$PREFIX/lib_g" $1
+}
+
+function buildCCE_component {
+
+    echo "----------------------------------------------------------"
+    echo "------------- Building $1 --------------------------------"
+    echo "----------------------------------------------------------"
+
+    DIR=$2
+
+    case $1 in
+    db)
+        rm -rf $TOP/buildoutput/$DIR/db
+        mkdir $TOP/buildoutput/$DIR/db
+        cd $TOP/buildoutput/$DIR/db
+        ../../../packages/db/dist/configure --enable-smallbuild \
+         --prefix=/usr --with-pic --enable-dbm --enable-compat185 \
+         --without-docs LIBS=-lpthread
+        make
+        make DESTDIR=$PREFIX install
+        make DESTDIR=$PREFIX uninstall_docs
+        libtool_fixup $PREFIX/usr/lib/libdb-5.3.la
+        make distclean
+        ;;
+
+    dahdi)
+        cd $TOP/cce/dahdi
+        export KVERS=3.8.0
+        export KSRC=$TOP/linux
+        make all
+        make DESTDIR=$PREFIX install
+        make DESTDIR=$PREFIX config 
+        make distclean
+ 	export DESTDIR=
+        export KVERS=
+        export KSRC=
+        ;;    
+
+    freeradius)
+        cd $TOP/cce/freeradius
+        ./configure --prefix=/usr --with-pic
+        make 
+        make R=$PREFIX DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    libpri)
+        cd $TOP/cce/libpri
+        make DESTDIR=$PREFIX install
+        make clean
+        export DESTDIR=
+        ;; 
+
+    libss7)
+        cd $TOP/cce/libss7
+        make
+        make INSTALL_PREFIX=$PREFIX install
+        make clean
+        export DESTDIR=
+        ;; 
+
+    zlib)
+        rm -rf $TOP/buildoutput/$DIR/zlib
+        mkdir $TOP/buildoutput/$DIR/zlib
+        cd $TOP/buildoutput/$DIR/zlib
+        export ZLIB_SOURCE=$TOP/packages/zlib
+        $TOP/Config/zlib_tree
+        ./configure --prefix= --libdir=/lib
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        export ZLIB_SOURCE=
+        ;;
+
+    gmp)
+        rm -rf $TOP/buildoutput/$DIR/gmp
+        mkdir $TOP/buildoutput/$DIR/gmp
+        cd $TOP/buildoutput/$DIR/gmp
+        ../../../packages/gmp/configure --prefix= --with-pic \
+        --enable-cxx --enable-mpbsd
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgmp.la
+        libtool_fixup $PREFIX/lib/libgmpxx.la
+        libtool_fixup $PREFIX/lib/libmp.la
+        make distclean
+        ;;
+
+    jansson)
+        rm -rf $TOP/buildoutput/$DIR/jansson
+        mkdir $TOP/buildoutput/$DIR/jansson
+        cd $TOP/buildoutput/$DIR/jansson
+        ../../../packages/jansson/configure \
+            --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    nettle)
+        rm -rf $TOP/buildoutput/$DIR/nettle
+        mkdir $TOP/buildoutput/$DIR/nettle
+        cd $TOP/buildoutput/$DIR/nettle
+        ../../../packages/nettle/configure \
+            --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    libnl)
+        rm -rf $TOP/buildoutput/$DIR/libnl
+        mkdir $TOP/buildoutput/$DIR/libnl
+        cd $TOP/buildoutput/$DIR/libnl
+        ../../../packages/libnl/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libnl-3.la
+        libtool_fixup $PREFIX/lib/libnl-cli-3.la
+        libtool_fixup $PREFIX/lib/libnl-genl-3.la
+        libtool_fixup $PREFIX/lib/libnl-nf-3.la
+        libtool_fixup $PREFIX/lib/libnl-route-3.la
+        libtool_fixup $PREFIX/lib/libnl/cli/qdisc/plug.la
+        libtool_fixup $PREFIX/lib/libnl/cli/qdisc/pfifo.la
+        libtool_fixup $PREFIX/lib/libnl/cli/qdisc/htb.la
+        libtool_fixup $PREFIX/lib/libnl/cli/qdisc/bfifo.la
+        libtool_fixup $PREFIX/lib/libnl/cli/qdisc/blackhole.la
+        libtool_fixup $PREFIX/lib/libnl/cli/cls/basic.la
+        libtool_fixup $PREFIX/lib/libnl/cli/cls/cgroup.la
+        make distclean
+        ;;
+
+    libpcap)
+        rm -rf $TOP/buildoutput/$DIR/libpcap
+        mkdir $TOP/buildoutput/$DIR/libpcap
+        cd $TOP/buildoutput/$DIR/libpcap
+        ../../../packages/libpcap/configure \
+        --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    gnutls)
+        rm -rf $TOP/buildoutput/$DIR/gnutls
+        mkdir $TOP/buildoutput/$DIR/gnutls
+        cd $TOP/buildoutput/$DIR/gnutls
+        export GNUTLS_SOURCE=$TOP/packages/gnutls
+        $TOP/Config/gnutls_tree
+        ./configure --prefix= --enable-silent-rules \
+           --disable-libdane --enable-gtk-doc-html=no 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgnutls.la
+        libtool_fixup $PREFIX/lib/libgnutls-openssl.la
+        libtool_fixup $PREFIX/lib/libgnutlsxx.la
+        make distclean
+        export GNUTLS_SOURCE=
+        ;;
+
+    readline)
+        rm -rf $TOP/buildoutput/$DIR/readline
+        mkdir $TOP/buildoutput/$DIR/readline
+        cd $TOP/buildoutput/$DIR/readline
+        ../../../packages/readline/configure \
+        --prefix= --with-curses
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    p11-kit)
+        rm -rf $TOP/buildoutput/$DIR/p11-kit
+        mkdir $TOP/buildoutput/$DIR/p11-kit
+        cd $TOP/buildoutput/$DIR/p11-kit
+        ../../../packages/p11-kit/configure --prefix= \
+        --enable-gtk-doc-html=no --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libp11-kit.la
+        make distclean
+        ;;
+
+    pkcs11-helper)
+        cd $TOP/cce/pkcs11-helper
+        ./configure --prefix= --with-pic 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    openvpn)
+        cd $TOP/cce/openvpn
+        ./configure --prefix= --enable-ssl --disable-debug \
+            --with-pic --disable-plugin-auth-pam --enable-crypto \
+            --enable-iproute2 --enable-pkcs11 --disable-lzo \
+            --enable-server
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    astgui)
+        cd $TOP/cce/astgui
+        ./configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    iax)
+        cd $TOP/cce/iax
+        make 
+        make INSTALL_ROOT=$PREFIX install
+        make clean
+        ;;    
+
+    gsm)
+        cd $TOP/cce/gsm
+        make 
+        make INSTALL_ROOT=$PREFIX install
+        make clean
+        ;;    
+
+    ptlib)
+        cd $TOP/cce/ptlib
+        ./configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    h323plus)
+        rm -rf $TOP/buildoutput/$DIR/h323plus
+        mkdir $TOP/buildoutput/$DIR/h323plus
+        cd $TOP/buildoutput/$DIR/h323plus
+        ../../../cce/ptlib/configure --prefix= 
+        make 
+        make DESTDIR=$PREFIX install
+        make clean
+        ;;    
+
+    pbx)
+        cd $TOP/cce/pbx
+        ./configure --prefix= --disable-xmldoc --enable-dev-mode
+        make 
+        make DESTDIR=$PREFIX install
+        make DESTDIR=$PREFIX samples  
+        make DESTDIR=$PREFIX config  
+        make distclean
+        ;;    
+
+    yate)
+        cd $TOP/tpd/apps/yate
+        ./configure --prefix= --with-qt4 --with-mysql=$PREFIX/mysql \
+            --with-pwlib=$PREFIX/lib --with-spandsp --with-openh323=$PREFIX/lib
+        make 
+        make DESTDIR=$PREFIX install
+        make DESTDIR=$PREFIX samples  
+        make DESTDIR=$PREFIX config  
+        make distclean
+        ;;    
+
+    vlc)
+        rm -rf $TOP/buildoutput/$DIR/vlc
+        mkdir $TOP/buildoutput/$DIR/vlc
+        cd $TOP/buildoutput/$DIR/vlc
+        ../../../cce/vlc/configure \
+            --enable-skins2 --prefix= --with-pic \
+            --enable-lua --enable-mad --enable-live555 --enable-dc1394 \
+            --enable-freetype --enable-fribidi --enable-fontconfig \
+            --enable-bluray --enable-alsa --enable-pulse --enable-dbus
+        make 
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    dnsmasq)
+        cd $TOP/cce/dnsmasq
+        ./configure --prefix= 
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        ;;
+
+    wvstreams)
+        cd $TOP/cce/wvstreams
+        ./configure --prefix= 
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;
+
+    wvdial)
+        cd $TOP/cce/wvdial
+        ./configure 
+	    make
+        make BINDIR=$TOP/images/$DIR/bin \
+             MANDIR=$TOP/images/$DIR/share/man/man5 \
+             PPPDIR=$TOP/images/$DIR/etc/ppp/peers install
+        make distclean
+        ;;
+
+    wireless_tools)
+        cd $TOP/packages/wireless_tools
+        make
+        make PREFIX=$PREFIX install
+        make clean
+        ;; 
+   
+    openssl)
+        rm -rf $TOP/buildoutput/$DIR/openssl
+        mkdir $TOP/buildoutput/$DIR/openssl
+        cd $TOP/buildoutput/$DIR/openssl
+        export OPENSSL_SOURCE=$TOP/packages/openssl
+        $TOP/Config/openssl_tree
+        ./Configure --prefix=/usr linux-$BUILD \
+            -L$PREFIX/lib shared -I$PREFIX/include -fPIC
+        make
+        make INSTALL_PREFIX=$PREFIX install
+        export OPENSSL_SOURCE=
+        ;; 
+   
+    curl)
+        rm -rf $TOP/buildoutput/$DIR/curl
+        mkdir $TOP/buildoutput/$DIR/curl
+        cd $TOP/buildoutput/$DIR/curl
+        ../../../packages/curl/configure --prefix=/usr \
+        --with-pic LIBS="-lssl -lcrypto" --disable-manual \
+        --disable-debug
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/usr/lib/libcurl.la
+        make distclean
+        ;;    
+
+    iptables)
+        rm -rf $TOP/buildoutput/$DIR/iptables
+        mkdir $TOP/buildoutput/$DIR/iptables
+        cd $TOP/buildoutput/$DIR/iptables
+        ../../../packages/iptables/configure --prefix=/usr \
+        --with-pic LIBS="-lssl -lcrypto" --disable-manual \
+        --disable-debug
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+        ;;    
+
+    iproute2)
+        cd $TOP/packages/iproute2
+        make 
+        make BINDIR=$TOP/images/$DIR/bin \
+         MANDIR=$TOP/images/$DIR/share/man/man5 \
+         DESTDIR=$TOP/images/$DIR \
+         PPPDIR=$TOP/images/$DIR/etc/ppp/peers install
+        make distclean
+        ;;    
+
+    snortsam)
+        cd $TOP/packages/snortsam
+        ./makesnortsam.sh
+        cp snortsam $PREFIX/bin
+        ;;
+    
+    wpa_supplicant)
+        cd $TOP/packages/hostap/wpa_supplicant
+        cp .config_full .config
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        export DESTDIR=
+        ;;    
+
+    hostapd)
+        cd $TOP/packages/hostap/hostapd
+        cp .config_cbir .config
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        export DESTDIR=
+        ;;    
+
+    wlantest)
+        cd $TOP/packages/hostap/wlantest
+        make
+        cp test_vectors wlantest wlantest_cli $PREFIX/bin
+        make clean
+        export DESTDIR=
+        ;;    
+
+    wpaspy)
+        cd $TOP/packages/hostap/wpaspy
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        export DESTDIR=
+        ;;    
+
+    *)
+        echo "wrong cce pack"
+        exit 1
+        ;;    
+    esac
+}
+
+function buildCCE {
+
+    case "$1" in
+        access)    
+            for pack in $cce_access_packages; do
+                buildCCE_component $pack access
+            done        
+            ;;          
+        vl)    
+            for pack in $cce_video_packages; do
+                buildCCE_component $pack vl
+            done        
+            ;;          
+        cce)    
+            for pack in $cce_voice_packages; do
+                buildCCE_component $pack cce
+            done        
+            ;;          
+
+        yate)    
+            for pack in $cce_yate_packages; do
+                buildCCE_component $pack yate
+            done        
+            ;;
+          
+        *)  
+            echo "Wrong cce pack class"
+            exit 1
+            ;;          
+    esac
+}
+
+function make_ccepack {
+
+    echo "--------- Making CCE Pack ---------------"
+
+    rm -rf $TOP/images/cce/DEBIAN
+    mkdir $TOP/images/cce/DEBIAN
+    echo "Package: cbircce
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR CCE
+    CBIR CCE platform" > $TOP/images/cce/DEBIAN/control
+
+    cd $TOP/images/cce/..
+    find ./cce -type d | xargs chmod 755
+    dpkg-deb --build cce
+    mkdir -p $TOP/images/builds
+    mv cce.deb $TOP/images/builds/cbircce-$BUILD.deb
+}
+
+function make_vlpack {
+
+    echo "--------- Making VL Pack ---------------"
+
+    rm -rf $TOP/images/vl/DEBIAN
+    mkdir $TOP/images/vl/DEBIAN
+    echo "Package: Cbirvl
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Video
+    CBIR Video platform" > $TOP/images/vl/DEBIAN/control
+
+    cd $TOP/images/vl/..
+    find ./vl -type d | xargs chmod 755
+    dpkg-deb --build vl
+    mkdir -p $TOP/images/builds
+    mv vl.deb $TOP/images/builds/cbirvl-$BUILD.deb
+}
+
+function make_yatepack {
+
+    echo "--------- Making YATE Pack ---------------"
+
+    rm -rf $TOP/images/yate/DEBIAN
+    mkdir $TOP/images/yate/DEBIAN
+    echo "Package: Cbiryate
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR yate
+    CBIR yate platform" > $TOP/images/yate/DEBIAN/control
+
+    cd $TOP/images/yate/..
+    find ./yate -type d | xargs chmod 755
+    dpkg-deb --build yate
+    mkdir -p $TOP/images/builds
+    mv yate.deb $TOP/images/builds/cbiryate-$BUILD.deb
+}
+
+function make_accesspack {
+
+    echo "--------- Making access pack ---------------"
+
+    rm -rf $TOP/images/access/DEBIAN
+    mkdir $TOP/images/access/DEBIAN
+    echo "Package: Cbiraccess
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Access
+    CBIR Access platform" > $TOP/images/access/DEBIAN/control
+
+    cd $TOP/images/access/..
+    find ./access -type d | xargs chmod 755
+    dpkg-deb --build access
+    mkdir -p $TOP/images/builds
+    mv access.deb $TOP/images/builds/cbiraccess-$BUILD.deb
+}
+
+if [ $CCE == 1 ] 
+then
+    echo "--------- Starting CCE build ---------------------"
+    rm -rf $TOP/buildoutput/cce
+    rm -rf $TOP/images/cce/htdocs
+    rm -rf $TOP/images/cce
+    mkdir $TOP/buildoutput/cce
+    mkdir $TOP/images/cce
+    mkdir $TOP/images/cce/htdocs
+    setenv_media 
+    buildCCE cce  
+    cp -r $TOP/cce/ccegui $TOP/images/cce/htdocs
+    cp -r $TOP/cce/smgui $TOP/images/cce/htdocs
+    cp -r $TOP/cce/wally $TOP/images/cce/htdocs
+    make_ccepack
+fi
+
+if [ $VIDLAN == 1 ] 
+then
+    echo "--------- Starting VL build ---------------------"
+    rm -rf $TOP/buildoutput/vl
+    rm -rf $TOP/images/vl
+    mkdir $TOP/buildoutput/vl
+    mkdir $TOP/images/vl
+    setenv_media 
+    buildCCE vl  
+    make_vlpack
+fi
+
+if [ $YATE == 1 ] 
+then
+    echo "--------- Starting YATE build ---------------------"
+    rm -rf $TOP/buildoutput/yate
+    rm -rf $TOP/images/yate
+    mkdir $TOP/buildoutput/yate
+    mkdir $TOP/images/yate
+    setenv_media 
+    buildCCE yate  
+    make_yatepack
+fi
+
+if [ $ACCESS == 1 ] 
+then
+    echo "-------- Starting Access package build ------------"
+    rm -rf $TOP/buildoutput/access
+    rm -rf $TOP/images/access
+    mkdir $TOP/buildoutput/access
+    mkdir $TOP/images/access
+    setenv_access
+    buildCCE access
+    make_accesspack
+fi

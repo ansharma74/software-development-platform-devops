@@ -1,0 +1,62 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : buildqt4
+#Description    : usage: buildqt4 qt4
+#                 i.e.:
+#                     buildqt4 qt4
+#Author         : Anil Sharma (CBIR)
+#Email          : cbir.anil@gmail.com
+#################### End ###################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   buildqt4 qt4
+    echo
+    echo i.e.:
+    echo   buildqt4 qt4
+    echo
+    exit 1
+fi
+
+BUILDTYPE=$1
+
+case "$BUILDTYPE" in
+    qt4)
+        echo "qt4 Build"
+        ;;
+    *)
+        echo "Choice: qt4"
+        exit 1
+        ;;
+esac
+
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+echo "----------Export Environment Variables-------"
+
+export PREFIX=$TOP/images/qt4
+rm -rf $PREFIX
+mkdir -p $PREFIX
+
+cd $TOP/packages/qt4
+make confclean
+./configure -prefix $PREFIX -release -nomake examples -nomake demos -no-exceptions -no-stl -no-qt3support -no-scripttools -no-openssl -no-opengl -no-webkit -no-phonon -no-sql-sqlite -opensource -confirm-license
+make
+make install
+make clean
