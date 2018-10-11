@@ -1,0 +1,597 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : configure.media
+#Description    : usage: configure.media x86_64 | i686 | arm | mips
+#                 i.e.:
+#                     configure.media x86_64
+#Author         : Anil Sharma (CBIR 2013 - 2015)
+#Email          : cbir.anil@gmail.com
+#################### End #################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   configure.media  "x86_64 | i686 | arm | mips"
+    echo
+    echo i.e.:
+    echo   configure.media x86_64
+    echo
+    exit 1
+fi
+
+BUILDTYPE=$1
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+ulimit -c unlimited
+
+source $TOP/packages_definitions
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+echo "----------Export Environment Variables-------"
+export PREFIX=$TOP/images/media
+TCHAIN=$TOP/x86_64
+
+export PATH=$PREFIX/bin:$PREFIX/usr/bin:$TCHAIN/bin:$TCHAIN/$TARGET/bin:$PATH
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/usr/lib/pkgconfig:$PREFIX/usr/lib64/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/usr/lib/pkgconfig:$TCHAIN/lib64/pkgconfig:$TCHAIN/usr/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$PREFIX/usr/lib64 -L$PREFIX/lib64 -L$TCHAIN/lib -L$TCHAIN/usr/lib -L$TCHAIN/lib64 -L$TCHAIN/usr/lib64 -L$PREFIX/lib/pulseaudio"
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/include/freetype2 -I$PREFIX/include/json -I$PREFIX/include/alsa -I$TCHAIN/include -I$TCHAIN/usr/include"
+export CXXFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/include/json -I$TCHAIN/include -I$TCHAIN/usr/include"
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/usr/lib64:$PREFIX/usr/lib/pulseaudio:$TCHAIN/lib:$TCHAIN/usr/lib:$TCHAIN/lib64:$TCHAIN/usr/lib64
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$PREFIX/usr/lib:$PREFIX/usr/lib64:$PREFIX/usr/lib/pulseaudio:$TCHAIN/lib:$TCHAIN/usr/lib:$TCHAIN/lib64:$TCHAIN/usr/lib64
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$PREFIX/include/freetype2:$TCHAIN/include:$TCHAIN/usr/include
+export CXX_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$TCHAIN/include:$TCHAIN/usr/include
+
+echo "----------Print Environment Variables ----------------"
+
+$TOP/Config/envtest
+
+function libtool_fixup {
+    sed -i -e "s_ /lib_ $PREFIX/lib_g" -e "s_'/lib_'$PREFIX/lib_g" $1
+}
+
+function buildmediapackages_component {
+
+    echo "---------------------------------------------------"
+    echo "------------------------ Building $1 --------------"
+    echo "---------------------------------------------------"
+
+    DIR=$2
+
+    case $1 in
+
+    pkg-config)
+        rm -rf $TOP/buildoutput/$DIR/pkg-config
+        mkdir $TOP/buildoutput/$DIR/pkg-config
+        cd $TOP/buildoutput/$DIR/pkg-config
+        ../../../packages/pkg-config/configure \
+            --prefix= --with-pic --with-internal-glib \
+            --disable-host-tool
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    expat)
+        rm -rf $TOP/buildoutput/$DIR/expat
+        mkdir $TOP/buildoutput/$DIR/expat
+        cd $TOP/buildoutput/$DIR/expat
+        ../../../packages/expat/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libexpat.la
+        ;;
+
+    zlib)
+        cd $TOP/packages/zlib
+        ./configure --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libtool)
+        rm -rf $TOP/buildoutput/$DIR/libtool
+        mkdir $TOP/buildoutput/$DIR/libtool
+        cd $TOP/buildoutput/$DIR/libtool
+        ../../../packages/libtool/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libltdl.la
+        ;;
+
+    sqlite-autoconf)
+        rm -rf $TOP/buildoutput/$DIR/sqlite-autoconf
+        mkdir $TOP/buildoutput/$DIR/sqlite-autoconf
+        cd $TOP/buildoutput/$DIR/sqlite-autoconf
+        ../../../packages/sqlite-autoconf/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libxml2)
+        rm -rf $TOP/buildoutput/$DIR/libxml2
+        mkdir $TOP/buildoutput/$DIR/libxml2
+        cd $TOP/buildoutput/$DIR/libxml2
+        ../../../packages/libxml2/configure \
+            --prefix= --with-pic --with-sax1
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libxml2.la
+        ;;
+
+    fribidi)
+        rm -rf $TOP/buildoutput/$DIR/fribidi
+        mkdir $TOP/buildoutput/$DIR/fribidi
+        cd $TOP/buildoutput/$DIR/fribidi
+        ../../../tpd/display/fribidi/configure \
+            --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfribidi.la
+        ;;
+
+    freetype)
+        rm -rf $TOP/buildoutput/$DIR/freetype
+        mkdir $TOP/buildoutput/$DIR/freetype
+        cd $TOP/buildoutput/$DIR/freetype
+        ../../../tpd/display/freetype/configure \
+            --prefix= --with-pic 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfreetype.la
+        ;;
+
+    fontconfig)
+        rm -rf $TOP/buildoutput/$DIR/fontconfig
+        mkdir $TOP/buildoutput/$DIR/fontconfig
+        cd $TOP/buildoutput/$DIR/fontconfig
+        export FONTCONFIG_SOURCE=$TOP/tpd/display/fontconfig
+        $TOP/Config/fontconfig_tree
+        ./configure --prefix= --with-pic --disable-docs 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libfontconfig.la
+        export FONTCONFIG_SOURCE=
+        ;;
+
+    libffi)
+       rm -rf $TOP/buildoutput/$DIR/libffi
+       mkdir $TOP/buildoutput/$DIR/libffi
+       cd $TOP/buildoutput/$DIR/libffi
+       ../../../packages/libffi/configure \
+        --prefix= --with-pic
+       make
+       make DESTDIR=$PREFIX install
+       libtool_fixup $PREFIX/lib/libffi.la
+       ;;
+
+    libusb)
+       rm -rf $TOP/buildoutput/$DIR/libusb
+       mkdir $TOP/buildoutput/$DIR/libusb
+       cd $TOP/buildoutput/$DIR/libusb
+       ../../../packages/libusb/configure --prefix= \
+        --with-pic --enable-shared
+       make
+       make DESTDIR=$PREFIX install
+       libtool_fixup $PREFIX/lib/libusb-1.0.la
+       ;;
+
+    libgcrypt)
+        rm -rf $TOP/buildoutput/$DIR/libgcrypt
+        mkdir $TOP/buildoutput/$DIR/libgcrypt
+        cd $TOP/buildoutput/$DIR/libgcrypt
+        ../../../packages/libgcrypt/configure \
+        --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgcrypt.la
+        ;;
+
+    libgpg-error)
+        rm -rf $TOP/buildoutput/$DIR/libgpg-error
+        mkdir $TOP/buildoutput/$DIR/libgpg-error
+        cd $TOP/buildoutput/$DIR/libgpg-error
+        ../../../packages/libgpg-error/configure \
+        --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libgpg-error.la
+        ;;
+
+    libpng)
+        rm -rf $TOP/buildoutput/$DIR/libpng
+        mkdir $TOP/buildoutput/$DIR/libpng
+        cd $TOP/buildoutput/$DIR/libpng
+        ../../../tpd/display/libpng/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpng15.la
+        libtool_fixup $PREFIX/lib/libpng.la
+        ;;
+
+    libogg)
+        rm -rf $TOP/buildoutput/$DIR/libogg
+        mkdir $TOP/buildoutput/$DIR/libogg
+        cd $TOP/buildoutput/$DIR/libogg
+        ../../../media/libogg/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libogg.la
+        ;;
+
+    libx264)
+        rm -rf $TOP/buildoutput/$DIR/libx264
+        mkdir $TOP/buildoutput/$DIR/libx264
+        cd $TOP/buildoutput/$DIR/libx264
+        ../../../media/libx264/configure --prefix= \
+            --enable-pic --enable-shared --enable-static
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    live)
+        rm -rf $PREFIX/usr/local/lib
+        cd $TOP/tpd/apps/live
+        ./genMakefiles linux-with-shared-libraries
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    openssl)
+        rm -rf $TOP/buildoutput/$DIR/openssl
+        mkdir $TOP/buildoutput/$DIR/openssl
+        cd $TOP/buildoutput/$DIR/openssl
+        export OPENSSL_SOURCE=$TOP/packages/openssl
+        $TOP/Config/openssl_tree
+        ./Configure --prefix=/usr linux-$BUILDTYPE \
+            -L$PREFIX/lib shared -I$PREFIX/include -fPIC
+        make
+        make INSTALL_PREFIX=$PREFIX install
+        export OPENSSL_SOURCE=
+        ;;
+
+    tiff)
+        rm -rf $TOP/buildoutput/$DIR/tiff
+        mkdir $TOP/buildoutput/$DIR/tiff
+        cd $TOP/buildoutput/$DIR/tiff
+        ../../../media/tiff/configure --prefix= --with-pic 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libtiff.la
+        libtool_fixup $PREFIX/lib/libtiffxx.la
+        ;;
+
+    alsa-lib)
+        rm -rf $TOP/buildoutput/$DIR/alsa-lib
+        mkdir $TOP/buildoutput/$DIR/alsa-lib
+        cd $TOP/buildoutput/$DIR/alsa-lib
+        ../../../media/alsa-lib/configure --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libasound.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-hda.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-sbase.la
+        libtool_fixup $PREFIX/lib/alsa-lib/smixer/smixer-ac97.la
+        ;;
+
+    ncurses)
+        rm -rf $TOP/buildoutput/$DIR/ncurses
+        mkdir $TOP/buildoutput/$DIR/ncurses
+        cd $TOP/buildoutput/$DIR/ncurses
+        ../../../packages/ncurses/configure --prefix= \
+        --with-shared --without-tests \
+        --without-debug --without-manpages --with-termlib CFLAGS=-fPIC
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    json-c)
+        rm -rf $TOP/buildoutput/$DIR/json-c
+        mkdir $TOP/buildoutput/$DIR/json-c
+        cd $TOP/buildoutput/$DIR/json-c
+        ../../../packages/json-c/configure --prefix= \
+        --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libjson.la
+        ;;
+
+    libsndfile)
+        rm -rf $TOP/buildoutput/$DIR/libsndfile
+        mkdir $TOP/buildoutput/$DIR/libsndfile
+        cd $TOP/buildoutput/$DIR/libsndfile
+        ../../../media/libsndfile/configure \
+            --prefix= --with-pic 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libsndfile.la
+        ;;
+
+    libass)
+        rm -rf $TOP/buildoutput/$DIR/libass
+        mkdir $TOP/buildoutput/$DIR/libass
+        cd $TOP/buildoutput/$DIR/libass
+        ../../../media/libass/configure --prefix= \
+            --with-pic 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libass.la
+        ;;
+
+    pulseaudio)
+        rm -rf $TOP/buildoutput/$DIR/pulseaudio
+        mkdir $TOP/buildoutput/$DIR/pulseaudio
+        cd $TOP/buildoutput/$DIR/pulseaudio
+        ../../../media/pulseaudio/configure --disable-manpages \
+            --prefix= --with-pic --enable-static --disable-udev \
+            --disable-systemd --disable-tests --enable-silent-rules 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libpulse.la
+        libtool_fixup $PREFIX/lib/libpulsecore-3.0.la
+        libtool_fixup $PREFIX/lib/libpulse-simple.la
+        libtool_fixup $PREFIX/lib/pulseaudio/libpulsecommon-3.0.la
+        libtool_fixup $PREFIX/lib/libpulse.la
+        libtool_fixup $PREFIX/lib/pulseaudio/libpulsedsp.la
+        ;;
+
+    libdvdread)
+        rm -rf $TOP/buildoutput/$DIR/libdvdread
+        mkdir $TOP/buildoutput/$DIR/libdvdread
+        cd $TOP/buildoutput/$DIR/libdvdread
+        ../../../media/libdvdread/configure --prefix= \
+            --with-pic --enable-shared  
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    jpeg)
+        rm -rf $TOP/buildoutput/$DIR/jpeg
+        mkdir $TOP/buildoutput/$DIR/jpeg
+        cd $TOP/buildoutput/$DIR/jpeg
+        ../../../packages/jpeg/configure --prefix=
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libjpeg.la
+        ;;
+
+    speex)
+        rm -rf $TOP/buildoutput/$DIR/speex
+        mkdir $TOP/buildoutput/$DIR/speex
+        cd $TOP/buildoutput/$DIR/speex
+        ../../../media/speex/configure --prefix= --with-pic 
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libspeex.la
+        libtool_fixup $PREFIX/lib/libspeexdsp.la
+        ;;
+
+    v4l-utils)
+        rm -rf $TOP/buildoutput/$DIR/v4l-utils
+        mkdir $TOP/buildoutput/$DIR/v4l-utils
+        cd $TOP/buildoutput/$DIR/v4l-utils
+        ../../../media/v4l-utils/configure \
+            --prefix= --with-pic --with-udevdir=$PREFIX
+        make
+        make DESTDIR=$PREFIX install
+        ;;
+
+    libvorbis)
+        rm -rf $TOP/buildoutput/$DIR/libvorbis
+        mkdir $TOP/buildoutput/$DIR/libvorbis
+        cd $TOP/buildoutput/$DIR/libvorbis
+        ../../../media/libvorbis/configure --prefix= \
+            --with-pic --enable-shared
+        make
+        make DESTDIR=$PREFIX install
+        libtool_fixup $PREFIX/lib/libvorbis.la
+        libtool_fixup $PREFIX/lib/libvorbisenc.la
+        libtool_fixup $PREFIX/lib/libvorbisfile.la
+        ;;
+
+    libdc1394)
+        rm -rf $TOP/buildoutput/$DIR/libdc1394
+        mkdir $TOP/buildoutput/$DIR/libdc1394
+        cd $TOP/buildoutput/$DIR/libdc1394
+        ../../../media/libdc1394/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    dvblast)
+        ;;
+
+    libaacs)
+        rm -rf $TOP/buildoutput/$DIR/libdc1394
+        mkdir $TOP/buildoutput/$DIR/libdc1394
+        cd $TOP/buildoutput/$DIR/libdc1394
+        ../../../media/libaacs/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    libbluray)
+        rm -rf $TOP/buildoutput/$DIR/libdc1394
+        mkdir $TOP/buildoutput/$DIR/libdc1394
+        cd $TOP/buildoutput/$DIR/libdc1394
+        ../../../media/libbluray/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    libdca)
+        rm -rf $TOP/buildoutput/$DIR/libdc1394
+        mkdir $TOP/buildoutput/$DIR/libdc1394
+        cd $TOP/buildoutput/$DIR/libdc1394
+        ../../../media/libdca/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    libdvbpsi)
+        rm -rf $TOP/buildoutput/$DIR/libdc1394
+        mkdir $TOP/buildoutput/$DIR/libdc1394
+        cd $TOP/buildoutput/$DIR/libdc1394
+        ../../../media/libdvbpsi/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    libmpeg2)
+        rm -rf $TOP/buildoutput/$DIR/libmpeg2
+        mkdir $TOP/buildoutput/$DIR/libmpeg2
+        cd $TOP/buildoutput/$DIR/libmpeg2
+        ../../../media/libmpeg2/configure --prefix= \
+            --with-pic --enable-shared  
+        ;;
+
+    a52dec)
+        rm -rf $TOP/buildoutput/$DIR/a52dec
+        mkdir $TOP/buildoutput/$DIR/a52dec
+        cd $TOP/buildoutput/$DIR/a52dec
+        ../../../media/a52dec/configure --prefix= --with-pic
+        ;;
+
+    alsa-utils)
+        rm -rf $TOP/buildoutput/$DIR/alsa-utils
+        mkdir $TOP/buildoutput/$DIR/alsa-utils
+        cd $TOP/buildoutput/$DIR/alsa-utils
+        export ALSAUTILS_SOURCE=$TOP/media/alsa-utils
+        $TOP/Config/alsautils_tree
+        ./configure --prefix= \
+            --with-alsa-prefix=$PREFIX/lib \
+            --with-alsa-inc-prefix=$PREFIX/include \
+            --with-udev-rules-dir= \
+            --with-asound-state-dir= \
+            --with-curses="ncurses" NCURSES_CFLAGS="-I$PREFIX/include/ncurses" \
+            NCURSES_LIBS="-L$PREFIX/lib" LIBS="-ltinfo -lncurses" --disable-xmlto
+        export ALSAUTILS_SOURCE=
+        ;;
+
+    bitstream)
+        ;;
+
+    ffmpeg)
+        rm -rf $TOP/buildoutput/$DIR/ffmpeg
+        mkdir $TOP/buildoutput/$DIR/ffmpeg
+        cd $TOP/buildoutput/$DIR/ffmpeg
+        ../../../media/ffmpeg/configure \
+            --prefix= \
+            --extra-cflags="-I$PREFIX/include -I$PREFIX/include/pulse" \
+            --extra-ldflags="-L$PREFIX/lib -B$PREFIX/lib/pulseaudio" --disable-txtpages \
+            --enable-pic --enable-shared --enable-gpl --enable-libpulse \
+            --enable-libx264 --enable-libv4l2 --enable-libspeex \
+            --enable-libass --enable-libfreetype \
+            --enable-libvorbis --disable-manpages --disable-debug \
+            --enable-fontconfig --disable-doc --disable-podpages \
+            --disable-txtpages
+        ;;
+
+    flac)
+        rm -rf $TOP/buildoutput/$DIR/flac
+        mkdir $TOP/buildoutput/$DIR/flac
+        cd $TOP/buildoutput/$DIR/flac
+        export FLAC_SOURCE=$TOP/media/flac
+        $TOP/Config/flac_tree
+        ./configure --prefix= --with-pic
+        export FLAC_SOURCE=
+        ;;
+
+    gstreamer)
+        rm -rf $TOP/buildoutput/$DIR/gstreamer
+        mkdir $TOP/buildoutput/$DIR/gstreamer
+        cd $TOP/buildoutput/$DIR/gstreamer
+        ../../../media/gstreamer/configure \
+            --prefix= --with-pic --disable-check --disable-tests \
+            --disable-examples --enable-gtk-doc-html
+        ;;
+
+    libdvdcss)
+        rm -rf $TOP/buildoutput/$DIR/libdvdcss
+        mkdir $TOP/buildoutput/$DIR/libdvdcss
+        cd $TOP/buildoutput/$DIR/libdvdcss
+        ../../../media/libdvdcss/configure --prefix= \
+            --with-pic --enable-shared --disable-doc
+        ;;
+
+    libdvdnav)
+        rm -rf $TOP/buildoutput/$DIR/libdvdnav
+        mkdir $TOP/buildoutput/$DIR/libdvdnav
+        cd $TOP/buildoutput/$DIR/libdvdnav
+        ../../../media/libdvdnav/configure2 \
+            --prefix= --extra-cflags=-fPIC \
+            --enable-shared --with-dvdread= \
+            --with-dvdread-config=$PREFIX/bin/dvdread-config \
+            --disable-debug 
+        ;;
+
+    libeXosip)
+        rm -rf $TOP/buildoutput/$DIR/libeXosip
+        mkdir $TOP/buildoutput/$DIR/libeXosip
+        cd $TOP/buildoutput/$DIR/libeXosip
+        ../../../media/libeXosip/configure --with-pic \
+            --prefix= --enable-openssl LDFLAGS=-L$PREFIX/usr/lib64 LIBS=-lssl
+        ;;
+
+    libfreenect)
+        cd $TOP/media/libfreenect
+        if [ -f CMakeCache.txt ]
+        then
+            make clean
+        fi
+        if [ -f CMakeCache.txt ]
+        then
+            rm CMakeCache.txt
+        fi
+        cmake . -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+        -DCMAKE_C_FLAGS:STRING="-fPIC -I$TOP/$BUILDTYPE/usr/include" \
+        -DLIBUSB_1_LIBRARY:FILEPATH=$TOP/images/media/lib/libusb-1.0.a \
+        -DLIBUSB_1_INCLUDE_DIR:PATH=$TOP/images/media/include/libusb-1.0
+        ;;
+
+    libosip)
+        rm -rf $TOP/buildoutput/$DIR/libosip
+        mkdir $TOP/buildoutput/$DIR/libosip
+        cd $TOP/buildoutput/$DIR/libosip
+        ../../../media/libosip/configure --prefix= --with-pic
+        ;;
+
+    multicat)
+        ;;
+
+    spandsp)
+        rm -rf $TOP/buildoutput/$DIR/spandsp
+        mkdir $TOP/buildoutput/$DIR/spandsp
+        cd $TOP/buildoutput/$DIR/spandsp
+        export SPANDSP_SOURCE=$TOP/media/spandsp
+        $TOP/Config/spandsp_tree
+        ./configure --prefix= --with-pic 
+        export SPANDSP_SOURCE=
+        ;;
+
+    *)
+        echo "wrong package"
+        echo "skip"
+        ;;
+
+    esac
+}
+
+function config_media_packages {
+        rm -rf $TOP/buildoutput/media
+        mkdir -p $TOP/buildoutput/media
+        for pack in $media_packages; do
+            buildmediapackages_component $pack media
+        done
+}
+
+config_media_packages

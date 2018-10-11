@@ -1,0 +1,192 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : buildtesttools
+#Description    : usage: buildtesttools <wireshark | python | wirelesstest> 
+#                           x86_64 | i686 | arm | mips
+#                 i.e.:
+#                     buildtesttools <wireshark> x86_64
+#Author         : Anil Sharma (CBIR 2013 - 2015)
+#Email          : cbir.anil@gmail.com
+#################### End #################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   buildtesttools "wireshark | python | wirelesstest" "x86_64 | i686 | arm | mips"
+    echo   
+    echo i.e.:
+    echo   buildtesttools wireshark x86_64
+    echo    
+    exit 1
+fi
+
+BUILDTYPE=$1
+BUILDMODE=$2
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+
+echo "----------Export Environment Variables-------"
+
+export PREFIX=$TOP/images/$BUILDTYPE
+
+export PATH=$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64"
+
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include"
+
+export CPPFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include"
+
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64
+
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64
+
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include
+
+export CPP_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include
+
+echo "----------Print Build Config----------------"
+
+$TOP/Config/envtest
+
+function make_wiresharkpack {
+
+    echo "-----------------------------------------------"
+    echo "-------------- Building wireshark -------------"
+    echo "-----------------------------------------------"
+
+    cd $TOP/buildoutput/wireshark
+    ../../wireshark/configure \
+        --prefix= --with-pic
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+    echo "--------- Making Wireshark Pack ---------------"
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: Cbirwireshark
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Wireshark Package
+    CBIR Wireshark" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./wireshark -type d | xargs chmod 755
+    dpkg-deb --build wireshark
+    mkdir -p $TOP/images/builds
+    mv wireshark.deb $TOP/images/builds/cbirwireshark-$BUILDMODE.deb
+}
+
+function make_wirelesstestpack {
+    echo "--------- Making Wirelesstest Pack ---------------"
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: Cbirwirelesstest
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Wirelesstest Package
+    CBIR Wirelesstest" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./wirelesstest -type d | xargs chmod 755
+    dpkg-deb --build wirelesstest
+    mkdir -p $TOP/images/builds
+    mv wirelesstest.deb $TOP/images/builds/cbirwirelesstest-$BUILDMODE.deb
+}
+
+function make_pythonpack {
+    echo "--------- Making python Pack ---------------"
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: Cbirpython
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Python Package
+    CBIR Pyhton" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./python -type d | xargs chmod 755
+    dpkg-deb --build python
+    mkdir -p $TOP/images/builds
+    mv python.deb $TOP/images/builds/cbirpython-$BUILDMODE.deb
+}
+
+case "$BUILDTYPE" in
+
+    wireshark)
+        rm -rf $TOP/buildoutput/wireshark
+        rm -rf $TOP/images/wireshark
+        mkdir $TOP/buildoutput/wireshark
+        mkdir $TOP/images/wireshark
+        make_wiresharkpack
+        ;;
+
+    python)
+        rm -rf $TOP/buildoutput/python
+        mkdir -p $TOP/buildoutput/python
+        cd $TOP/buildoutput/python
+        ../../packages/python/configure --prefix= --with-system-expat
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        make_pythonpack
+        ;;
+
+    wirelesstest)
+        rm -rf $TOP/buildoutput/wirelesstest/libpcap
+        mkdir -p $TOP/buildoutput/wirelesstest/libpcap
+        cd $TOP/buildoutput/wirelesstest/libpcap
+        ../../../packages/libpcap/configure \
+        --prefix= --with-pic
+        make
+        make DESTDIR=$PREFIX install
+        make distclean
+
+        cd $TOP/packages/hostap/wlantest
+        make
+        cp test_vectors wlantest wlantest_cli $PREFIX/bin
+        make clean
+
+        cd $TOP/packages/hostap/wpaspy
+        make
+        make DESTDIR=$PREFIX install
+        make clean
+        export DESTDIR=
+
+        make_wirelesstestpack
+        ;;
+
+    *)   
+        echo "Choices are as follows: wireshark | python | wirelesstest"
+        exit 1
+        ;;
+esac

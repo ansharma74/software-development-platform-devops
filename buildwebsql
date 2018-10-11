@@ -1,0 +1,236 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Script Name    : buildwebsql
+#Description    : usage: buildwebsql package_type build-type
+#                 i.e.:
+#                     buildwebsql <x86_64> webserver
+#Author         : Anil Sharma (CBIR 2013 - 2015)
+#Email          : cbir.anil@gmail.com
+#################### End #################################
+
+set -e
+set -o pipefail
+
+MINPARAMS=1
+if [ $# -lt "$MINPARAMS" ]
+then
+    echo usage:
+    echo   buildwebsql "package_type" "build-type"
+    echo   
+    echo i.e.:
+    echo   buildwebsql webserver
+    echo    
+    exit 1
+fi
+
+PACKTYPE=$1
+BUILD=$2
+CC=""                     
+CXX=""                    
+AR=""                       
+RANLIB=""     
+HOST=""
+TARGET=""         
+
+TOP=`pwd`
+echo Source Base=$TOP
+
+case "$BUILD" in
+    x86_64)
+        echo "x86_64 Build"
+        CC="x86_64-unknown-linux-gnu-gcc"                      
+        CXX="x86_64-unknown-linux-gnu-g++"                     
+        AR="x86_64-unknown-linux-gnu-ar"                        
+        RANLIB="x86_64-unknown-linux-gnu-ranlib"      
+        HOST="x86_64-pc-linux-gnu"
+        TARGET="x86_64-unknown-linux-gnu"       
+        ;;
+    i686)
+        echo "i686 Build"
+        CC=i686-unknown-linux-gnu-gcc                      
+        CXX=i686-unknown-linux-gnu-g++                     
+        AR=i686-unknown-linux-gnu-ar                        
+        RANLIB=i686-unknown-linux-gnu-ranlib              
+        ;;
+    arm)
+        echo "arm Build"
+        CC=arm-unknown-linux-gnu-gcc                      
+        CXX=arm-unknown-linux-gnu-g++                     
+        AR=arm-unknown-linux-gnu-ar                        
+        RANLIB=arm-unknown-linux-gnu-ranlib              
+        ;;
+    mips)
+        echo "mips Build"
+        CC=mips-unknown-linux-gnu-gcc                      
+        CXX=mips-unknown-linux-gnu-g++                     
+        AR=mips-unknown-linux-gnu-ar                        
+        RANLIB=mips-unknown-linux-gnu-ranlib              
+        ;;
+    *)
+        echo "Platform choices are: x86_64, i686, arm, mips"
+        exit 1
+        ;;
+esac
+
+echo "--------------Testing Build Tools--------------"
+
+$TOP/Config/buildpackageversion
+
+echo "----------Print Default Config----------------"
+
+$TOP/Config/envtest
+TCHAIN=$TOP/$BUILD
+
+echo "----------Export Environment Variables-------"
+
+export PREFIX=$TOP/images/$PACKTYPE
+
+export PATH=$TCHAIN/bin:$PREFIX/bin:$PREFIX/lib:$PREFIX/include:$PREFIX/usr/lib:$PREFIX/usr/include:$PREFIX/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$TCHAIN/lib/pkgconfig:$TCHAIN/lib64/pkgconfig
+
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64 -L$TCHAIN/$HOST/$TARGET/lib -L$TCHAIN/lib -L$TCHAIN/lib64"
+
+export CFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$TCHAIN/include -I$TCHAIN/usr/include"
+
+export CPPFLAGS="-fPIC -I$PREFIX/include -I$PREFIX/usr/include -I$TCHAIN/include -I$TCHAIN/usr/include"
+
+export LD_LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64
+
+export LIBRARY_PATH=$PREFIX/lib:$PREFIX/lib64:$TCHAIN/$HOST/$TARGET/lib:$TCHAIN/lib:$TCHAIN/lib64
+
+export C_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$TCHAIN/include:$TCHAIN/usr/include
+
+export CPP_INCLUDE_PATH=$PREFIX/include:$PREFIX/usr/include:$TCHAIN/include:$TCHAIN/usr/include
+
+echo "----------Print Build Config----------------"
+
+$TOP/Config/envtest
+
+function make_webserverpack {
+
+    echo "-----------------------------------------------"
+    echo "-------------- Building webserver -------------"
+    echo "-----------------------------------------------"
+
+    rm -rf $TOP/buildoutput/webserver/pcre
+    mkdir $TOP/buildoutput/webserver/pcre
+    cd $TOP/buildoutput/webserver/pcre
+    CC=$CC             \
+    CXX=$CXX           \
+    AR=$AR             \
+    RANLIB=$RANLIB     \
+    ../../../packages/pcre/configure --prefix=
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+    rm -rf $TOP/buildoutput/webserver/apache
+    mkdir $TOP/buildoutput/webserver/apache
+    cd $TOP/buildoutput/webserver/apache
+    CC=$CC             \
+    CXX=$CXX           \
+    AR=$AR             \
+    RANLIB=$RANLIB     \
+    ../../../apache/httpd/configure \
+        --prefix=/usr/local/apache2 --with-pic
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+
+    echo "--------- Making Webserver Pack ---------------"
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: Cbirwebserver
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR Webserver Package
+    CBIR Webserver" > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./webserver -type d | xargs chmod 755
+    dpkg-deb --build webserver
+    mkdir -p $TOP/images/builds
+    mv webserver.deb $TOP/images/builds/cbirwebserver-$BUILD.deb
+}
+
+function make_mysqlpack {
+
+    echo "--------- Making MySQL Install ---------------"
+
+    rm -rf $TOP/buildoutput/mysql/ncurses
+    mkdir $TOP/buildoutput/mysql/ncurses
+    cd $TOP/buildoutput/mysql/ncurses
+    ../../../packages/ncurses/configure --prefix= \
+        --with-shared --without-debug --without-tests \
+        --without-manpages --with-termlib
+    make
+    make DESTDIR=$PREFIX install
+    make distclean
+
+    cd $TOP/mysql
+    if [ -f Makefile ]
+    then
+        make clean
+    fi
+    if [ -f CMakeCache.txt ]
+    then
+        rm CMakeCache.txt
+    fi
+    CURSES_P=$TOP/images/mysql
+    cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DWITH_PIC=ON \
+    -DBUILD_TYPE=MINSIZEREL -DWITH_UNIT_TESTS=OFF -DWITH_DEBUG=OFF \
+    -DCMAKE_BUILD_TYPE=MinSizeRel -DCURSES_LIBRARY=$CURSES_P/lib \
+    -DFEATURE_SET=small -DCURSES_INCLUDE_PATH=$CURSES_P/include \
+    -DWITH_EMBEDDED_SERVER=OFF -DWITH_EXTRA_CHARSETS=none \
+    -DENABLED_PROFILING=OFF -DINSTALL_LAYOUT=DEB \
+    -DINSTALL_MYSQLTESTDIR=OFF
+    make
+    make DESTDIR=$PREFIX install
+    make clean
+
+    rm -rf $PREFIX/DEBIAN
+    mkdir $PREFIX/DEBIAN
+    echo "Package: Cbirmysql
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: CBIR (info@cbir.in)
+Description: CBIR MySQL 
+    MySQL install " > $PREFIX/DEBIAN/control
+
+    cd $PREFIX/..
+    find ./mysql -type d | xargs chmod 755
+    dpkg-deb --build mysql
+    mkdir -p $TOP/images/builds
+    mv mysql.deb $TOP/images/builds/cbirmysql-$BUILD.deb
+}
+
+case "$PACKTYPE" in
+    webserver)
+        rm -rf $TOP/buildoutput/webserver
+        rm -rf $TOP/images/webserver
+        mkdir -p $TOP/buildoutput/webserver
+        mkdir -p $TOP/images/webserver
+        make_webserverpack
+        ;;
+    mysql)
+        rm -rf $TOP/buildoutput/mysql
+        rm -rf $TOP/images/mysql
+        mkdir -p $TOP/buildoutput/mysql
+        mkdir -p $TOP/images/mysql
+        make_mysqlpack
+        ;;
+    *)   
+        echo "Choices for pack are as follows: webserver | mysql"
+        exit 1
+        ;;
+esac
+

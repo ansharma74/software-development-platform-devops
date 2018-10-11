@@ -5,7 +5,7 @@
 #Description    : usage: build.nids <package_type>
 #                 i.e.:
 #                     build.nids snort | full
-#Author         : Anil Sharma (CBIR)
+#Author         : Anil Sharma (CBIR 2013 - 2015)
 #Email          : cbir.anil@gmail.com
 #################### End ###################################
 

@@ -6,7 +6,7 @@
 #                 target choice: x86_64 | i686 | arm | mips
 #                 i.e.:
 #                     build.os nos x86_64
-#Author         : Anil Sharma (CBIR)
+#Author         : Anil Sharma (CBIR 2013 - 2015)
 #Email          : cbir.anil@gmail.com
 #################### End ###################################
 
