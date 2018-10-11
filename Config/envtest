@@ -1,0 +1,12 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Author         : Anil Sharma (CBIR 2013 - 2015)
+#Email          : cbir.anil@gmail.com
+#################### End #################################
+echo PATH = $PATH
+echo C_INCLUDE_PATH = $C_INCLUDE_PATH
+echo CXX_INCLUDE_PATH = $CXX_INCLUDE_PATH
+echo LIBRARY_PATH= $LIBRARY_PATH
+echo LD_LIBRARY_PATH = $LD_LIBRARY_PATH
+

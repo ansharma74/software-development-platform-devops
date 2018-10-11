@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#################### Script Header #########################
+#Author         : Anil Sharma (CBIR 2013 - 2015)
+#Email          : cbir.anil@gmail.com
+#################### End #################################
+# Place yourself outside of the gnutls source tree.  In
+# this example, the environment variable GNUTLS_SOURCE
+# is assumed to contain the absolute GNUTLS source directory.
+
+(cd $GNUTLS_SOURCE; find . -type f) | while read F; do
+	mkdir -p `dirname $F`
+	ln -s $GNUTLS_SOURCE/$F $F
+done
+
